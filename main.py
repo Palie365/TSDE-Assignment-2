@@ -85,7 +85,10 @@ def part1_3_and_4(best_model, best_p, h=8):
     # plot with CI
     plt.figure(figsize=(10, 4))
     plt.plot(np.arange(T1), data1, color='#4682b4', linewidth=1.5, label="Observed")
-    plt.plot(forecast_index, forecasts, color='#cd5c5c', linewidth=1.5, label="Forecast")
+    # make the connection with the forecast seamless
+    forecast_x = np.concatenate([[T1 - 1], forecast_index])
+    forecast_y = np.concatenate([[data1[-1]], forecasts])
+    plt.plot(forecast_x, forecast_y, color='#cd5c5c', linewidth=1.5, label="Forecast")
     plt.fill_between(forecast_index, ci_lower, ci_upper,
                      color='#cd5c5c', alpha=0.35, label="95% CI")
     plt.title(f"Forecasts with 95% CI (AR({best_p}), {h} Quarters Ahead)")
@@ -106,18 +109,18 @@ def part1_3_and_4(best_model, best_p, h=8):
     jb_stat, jb_p, _, _ = jarque_bera(residuals)
     print(f"\nJarque–Bera test: stat={jb_stat:.2f}, p-value={jb_p:.3f}")
     if jb_p < 0.05:
-        print(" -> Residuals deviate from normality.")
+        print("Residuals deviate from normality.")
     else:
-        print(" -> Residuals consistent with normality.")
+        print("Residuals consistent with normality.")
 
     # Breusch godfrey test
     k = int(np.sqrt(T1))
     bg_stat, bg_pval, _, _ = acorr_breusch_godfrey(best_model, nlags=k)
     print(f"Breusch–Godfrey test (lag={k}): stat={bg_stat:.2f}, p-value={bg_pval:.3f}")
     if bg_pval < 0.05:
-        print(" -> Residuals show autocorrelation.")
+        print("Residuals show autocorrelation.")
     else:
-        print(" -> Residuals are consistent with white noise.")
+        print("Residuals are consistent with white noise.")
 
 def dataloader2():
     GDP_df = data2_df.copy()
@@ -203,6 +206,7 @@ if __name__ == "__main__":
 
     alpha_hat, phi_hat, beta_hat = best_model.params[0], np.array([best_model.params[1], best_model.params[2], best_model.params[3]]), np.array([best_model.params[4], best_model.params[5]])
     part2_3(alpha_hat, phi_hat, beta_hat, 0.02)                 ### we could make a figure of Y_bar as a function of X_bar if we want. could be a nice addition
+
 
 
 
