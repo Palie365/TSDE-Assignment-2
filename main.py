@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from statsmodels.graphics.tsaplots import plot_acf
 from statsmodels.tsa.stattools import acf
+from statsmodels.stats.diagnostic import acorr_breusch_godfrey
+from statsmodels.stats.stattools import jarque_bera
 import statsmodels.api as sm
 from statsmodels.tsa.ardl import ARDL
 import numpy as np
@@ -201,5 +203,6 @@ if __name__ == "__main__":
 
     alpha_hat, phi_hat, beta_hat = best_model.params[0], np.array([best_model.params[1], best_model.params[2], best_model.params[3]]), np.array([best_model.params[4], best_model.params[5]])
     part2_3(alpha_hat, phi_hat, beta_hat, 0.02)                 ### we could make a figure of Y_bar as a function of X_bar if we want. could be a nice addition
+
 
 
