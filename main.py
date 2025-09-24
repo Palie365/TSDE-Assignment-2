@@ -59,29 +59,44 @@ def part1_2():
 
     return best_model, best_p
     
-def part1_3_and_4(best_model, best_p):
-    forecast = best_model.get_forecast(steps=8)
-    forecast_mean = forecast.predicted_mean
-    conf_int = np.asarray(forecast.conf_int(alpha=0.05))  # ensure array
-    forecast_index = np.arange(T1, T1 + 8)
+def part1_3_and_4(best_model, best_p, h=8):
+    const_hat = best_model.params[0]
+    phi_hat = best_model.params[1]
 
-    # plot
+    # forecasts
+    forecasts = []
+    X_T = data1[T1 - 1]
+    for _ in range(h):
+        next_val = const_hat + phi_hat * X_T
+        forecasts.append(next_val)
+        X_T = next_val
+    forecasts = np.array(forecasts)
+
+    # variance and standard error for CI
+    var_hat = np.var(best_model.resid, ddof=best_p + 1)
+    se = np.sqrt(var_hat * np.cumsum(phi_hat ** (2 * np.arange(1, h + 1))))
+    ci_lower = forecasts - 1.96 * se
+    ci_upper = forecasts + 1.96 * se
+
+    forecast_index = np.arange(T1, T1 + h)
+
+    # plot with CI
     plt.figure(figsize=(10, 4))
     plt.plot(np.arange(T1), data1, color='#4682b4', linewidth=1.5, label="Observed")
-    plt.plot(forecast_index, forecast_mean, color='#cd5c5c', linewidth=1.5, label="Forecast")
-    plt.fill_between(forecast_index, conf_int[:, 0], conf_int[:, 1],
-                     color='#cd5c5c', alpha=0.35, label="95% CI")  # darker CI
-    plt.title(f"Forecasts with 95% CI (AR({best_p}), 8 Quarters Ahead)")
+    plt.plot(forecast_index, forecasts, color='#cd5c5c', linewidth=1.5, label="Forecast")
+    plt.fill_between(forecast_index, ci_lower, ci_upper,
+                     color='#cd5c5c', alpha=0.35, label="95% CI")
+    plt.title(f"Forecasts with 95% CI (AR({best_p}), {h} Quarters Ahead)")
     plt.xlabel("Time")
     plt.ylabel("GDP Growth (%)")
     plt.grid(True, alpha=0.1)
     plt.legend()
     plt.show()
 
-    # forecast
+    # forecasts
     print("Forecasts for next 8 quarters (with 95% CI):")
-    for h, (mean, lo, hi) in enumerate(zip(forecast_mean, conf_int[:, 0], conf_int[:, 1]), start=1):
-        print(f"h={h}: {mean:.4f}  (95% CI: {lo:.4f}, {hi:.4f})")
+    for i, (f, lo, hi) in enumerate(zip(forecasts, ci_lower, ci_upper), start=1):
+        print(f"h={i}: {f:.4f}  (95% CI: {lo:.4f}, {hi:.4f})")
 
     residuals = best_model.resid
 
@@ -95,8 +110,7 @@ def part1_3_and_4(best_model, best_p):
 
     # Breusch godfrey test
     k = int(np.sqrt(T1))
-    bg_test = acorr_breusch_godfrey(best_model, nlags=k)
-    bg_stat, bg_pval = bg_test[0], bg_test[1]
+    bg_stat, bg_pval, _, _ = acorr_breusch_godfrey(best_model, nlags=k)
     print(f"Breusch–Godfrey test (lag={k}): stat={bg_stat:.2f}, p-value={bg_pval:.3f}")
     if bg_pval < 0.05:
         print(" -> Residuals show autocorrelation.")
@@ -187,4 +201,5 @@ if __name__ == "__main__":
 
     alpha_hat, phi_hat, beta_hat = best_model.params[0], np.array([best_model.params[1], best_model.params[2], best_model.params[3]]), np.array([best_model.params[4], best_model.params[5]])
     part2_3(alpha_hat, phi_hat, beta_hat, 0.02)                 ### we could make a figure of Y_bar as a function of X_bar if we want. could be a nice addition
+
 
