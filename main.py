@@ -58,6 +58,50 @@ def part1_2():
     print(best_model.summary())
 
     return best_model, best_p
+    
+def part1_3_and_4(best_model, best_p):
+    forecast = best_model.get_forecast(steps=8)
+    forecast_mean = forecast.predicted_mean
+    conf_int = np.asarray(forecast.conf_int(alpha=0.05))  # ensure array
+    forecast_index = np.arange(T1, T1 + 8)
+
+    # plot
+    plt.figure(figsize=(10, 4))
+    plt.plot(np.arange(T1), data1, color='#4682b4', linewidth=1.5, label="Observed")
+    plt.plot(forecast_index, forecast_mean, color='#cd5c5c', linewidth=1.5, label="Forecast")
+    plt.fill_between(forecast_index, conf_int[:, 0], conf_int[:, 1],
+                     color='#cd5c5c', alpha=0.35, label="95% CI")  # darker CI
+    plt.title(f"Forecasts with 95% CI (AR({best_p}), 8 Quarters Ahead)")
+    plt.xlabel("Time")
+    plt.ylabel("GDP Growth (%)")
+    plt.grid(True, alpha=0.1)
+    plt.legend()
+    plt.show()
+
+    # forecast
+    print("Forecasts for next 8 quarters (with 95% CI):")
+    for h, (mean, lo, hi) in enumerate(zip(forecast_mean, conf_int[:, 0], conf_int[:, 1]), start=1):
+        print(f"h={h}: {mean:.4f}  (95% CI: {lo:.4f}, {hi:.4f})")
+
+    residuals = best_model.resid
+
+    # Jarque bera test
+    jb_stat, jb_p, _, _ = jarque_bera(residuals)
+    print(f"\nJarque–Bera test: stat={jb_stat:.2f}, p-value={jb_p:.3f}")
+    if jb_p < 0.05:
+        print(" -> Residuals deviate from normality.")
+    else:
+        print(" -> Residuals consistent with normality.")
+
+    # Breusch godfrey test
+    k = int(np.sqrt(T1))
+    bg_test = acorr_breusch_godfrey(best_model, nlags=k)
+    bg_stat, bg_pval = bg_test[0], bg_test[1]
+    print(f"Breusch–Godfrey test (lag={k}): stat={bg_stat:.2f}, p-value={bg_pval:.3f}")
+    if bg_pval < 0.05:
+        print(" -> Residuals show autocorrelation.")
+    else:
+        print(" -> Residuals are consistent with white noise.")
 
 def dataloader2():
     GDP_df = data2_df.copy()
@@ -136,9 +180,11 @@ def part2_3(alpha, phi, beta, X_bar):
 if __name__ == "__main__":
     part1_1()
     best_model, best_p = part1_2()
+    part1_3_and_4(best_model, best_p)
 
     GDP_data, UN_data = dataloader2()
     best_model = part2_1(GDP_data, UN_data)
 
     alpha_hat, phi_hat, beta_hat = best_model.params[0], np.array([best_model.params[1], best_model.params[2], best_model.params[3]]), np.array([best_model.params[4], best_model.params[5]])
     part2_3(alpha_hat, phi_hat, beta_hat, 0.02)                 ### we could make a figure of Y_bar as a function of X_bar if we want. could be a nice addition
+
