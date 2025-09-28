@@ -79,9 +79,9 @@ def part1_3_and_4(best_model, best_p, h=8):
     forecasts = np.array(forecasts)
 
     # variance and standard error for CI
+
     var_hat = np.var(best_model.resid, ddof=best_p + 1)
-    psi_sq_sum = np.cumsum(phi_hat ** (2 * np.arange(h)))
-    se = np.sqrt(var_hat * psi_sq_sum)
+    se = np.sqrt(var_hat * np.cumsum(phi_hat ** (2 * np.arange(1, h + 1))))
     ci_lower = forecasts - 1.96 * se
     ci_upper = forecasts + 1.96 * se
 
