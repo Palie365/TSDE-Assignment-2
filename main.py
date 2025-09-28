@@ -187,88 +187,91 @@ def part2_3(alpha, phi, beta, X_bar):
         f"The long-run equilibruim unemployment rate for a fixed GDP growth rate of {X_bar}% is approximately {Y_bar:.2f}%.\n")
 
 
-def part2_4(ar_model, adl_model, horizon=80):
-    print("\n--- PART 2.4: Impulse Response Functions ---")
-    # --- 1. Extract parameters ---
-    ar_params = ar_model.params
-    p_gdp = ar_model.model.order[0]
-    phi_gdp = ar_params[1:1 + p_gdp].values
+def part2_4(gdp_ar_model, unemployment_adl_model, gdp_data, un_data, horizon=70):
 
-    adl_params = adl_model.params
-    p_un = len(adl_model.ar_lags)
+    # get the last values from the data to use as the starting point for the plots
+    gdp_start_value = gdp_data.iloc[-1].values[0]
+    unemployment_start_value = un_data.iloc[-1]
+    print(f"Using origins: GDP Growth = {gdp_start_value:.2f}, Unemployment = {unemployment_start_value:.2f}")
 
-    # number of betas = total params - ar params
-    num_beta_coeffs = len(adl_params) - 1 - p_un
-    # The order 'q' is the number of beta coefficients minus one (since it includes beta_0).
-    q_un_lags = num_beta_coeffs - 1
+    # get coefficients from the GDP model
+    gdp_ar_coeffs = gdp_ar_model.params[1:].values
+    gdp_p = gdp_ar_model.model.order[0]
 
-    phi_un = adl_params[1:1 + p_un].values
-    beta_un = adl_params[1 + p_un:].values
+    # get coefficients from the Unemployment ADL model
+    adl_params = unemployment_adl_model.params
+    unemployment_p = len(unemployment_adl_model.ar_lags)
+    # The number of beta coeffs is total params - const - ar_coeffs
+    num_beta_coeffs = len(adl_params) - 1 - unemployment_p
+    # The order q is the number of betas minus one (for the L0 term)
+    unemployment_q = num_beta_coeffs - 1
+    unemployment_ar_coeffs = adl_params[1: 1 + unemployment_p].values
+    unemployment_dl_coeffs = adl_params[1 + unemployment_p:].values
 
-    # --- 2. Initialize derivative arrays ---
-    d_gdp = np.zeros(horizon)
-    d_un = np.zeros(horizon)
+    # create empty arrays to store the results of the derivative calculations
+    gdp_derivatives = np.zeros(horizon)
+    unemployment_derivatives = np.zeros(horizon)
 
-    # --- 3. Recursive computation of derivatives ---
-    d_gdp[0] = 1.0
+    # the first shock has a size of 1
+    gdp_derivatives[0] = 1.0
+    unemployment_derivatives[0] = unemployment_dl_coeffs[0] * gdp_derivatives[0]
 
-    # In the code, d_un[h] represents ∂Y_{k+h}/∂u_k
-
-    # Initial Condition (before the loop)
-    if len(beta_un) > 0:
-        d_un[0] = beta_un[0] * d_gdp[0]
-
+    # loop through time to calculate the effect of the shock step by step
     for h in range(1, horizon):
-        # GDP response (AR process)
-        for i in range(p_gdp):
-            if h - (i + 1) >= 0:
-                d_gdp[h] += phi_gdp[i] * d_gdp[h - (i + 1)]
 
-        # Unemployment response (ADL process)
-        # AR part
-        for i in range(p_un):
+        # calculate the response of GDP to its own past values
+        # this is the recursive formula for an AR(p) process, see Week 4 Slide 11/44
+        for i in range(gdp_p):
             if h - (i + 1) >= 0:
-                d_un[h] += phi_un[i] * d_un[h - (i + 1)]
-        # DL part
-        for j in range(q_un_lags + 1):
+                gdp_derivatives[h] += gdp_ar_coeffs[i] * gdp_derivatives[h - (i + 1)]
+
+        # calculate the response of Unemployment
+        # this is the recursive formula for an ADL(p,q) process, see Week 4 Slide 35/44
+
+        # effect from its own past (the AR part of the ADL)
+        for i in range(unemployment_p):
+            if h - (i + 1) >= 0:
+                unemployment_derivatives[h] += unemployment_ar_coeffs[i] * unemployment_derivatives[h - (i + 1)]
+
+        # effect from current and past GDP values (the DL part of the ADL)
+        for j in range(unemployment_q + 1):
             if h - j >= 0:
-                d_un[h] += beta_un[j] * d_gdp[h - j]
+                unemployment_derivatives[h] += unemployment_dl_coeffs[j] * gdp_derivatives[h - j]
 
-    # --- 4. Calculate IRFs for good and bad shocks ---
-    s_good = 2.0
-    s_bad = -2.0
-    irf_gdp_good = d_gdp * s_good
-    irf_gdp_bad = d_gdp * s_bad
-    irf_un_good = d_un * s_good
-    irf_un_bad = d_un * s_bad
+    # define the shock sizes from the assignment
+    positive_shock_size = 2.0
+    negative_shock_size = -2.0
 
-    # --- 5. Plotting ---
-    print("Plotting IRFs...")
+    # calculate the final paths by adding the starting value to the shock effect
+    gdp_path_positive_shock = gdp_start_value + (gdp_derivatives * positive_shock_size)
+    gdp_path_negative_shock = gdp_start_value + (gdp_derivatives * negative_shock_size)
+    unemployment_path_positive_shock = unemployment_start_value + (unemployment_derivatives * positive_shock_size)
+    unemployment_path_negative_shock = unemployment_start_value + (unemployment_derivatives * negative_shock_size)
+
+    # now, make the plot
     time_axis = np.arange(horizon)
     fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
     fig.suptitle('Impulse Response Functions to a Shock in GDP Growth', fontsize=16)
 
-    # GDP IRF plot
-    axs[0].plot(time_axis, irf_gdp_good, label='Response to Positive Shock (+2%)', color='green', marker='o',
+    # top plot for GDP
+    axs[0].plot(time_axis, gdp_path_positive_shock, label='Response to Positive Shock (+2%)', color='green', marker='o',
                 markersize=3, alpha=0.7)
-    axs[0].plot(time_axis, irf_gdp_bad, label='Response to Negative Shock (-2%)', color='red', marker='x', markersize=3,
-                alpha=0.7)
-    axs[0].axhline(0, color='black', linestyle='--', linewidth=0.8)
+    axs[0].plot(time_axis, gdp_path_negative_shock, label='Response to Negative Shock (-2%)', color='red', marker='x',
+                markersize=3, alpha=0.7)
     axs[0].set_title('Dynamic Response of GDP Growth Rate')
-    axs[0].set_ylabel('Change in GDP Growth (%)')
-    axs[0].grid(True, linestyle=':', alpha=0.6)
+    axs[0].set_ylabel('GDP Growth Rate (%)')
+    axs[0].grid(True, alpha=0.4)
     axs[0].legend()
 
-    # Unemployment IRF plot
-    axs[1].plot(time_axis, irf_un_good, label='Response to Positive GDP Shock', color='green', marker='o', markersize=3,
-                alpha=0.7)
-    axs[1].plot(time_axis, irf_un_bad, label='Response to Negative GDP Shock', color='red', marker='x', markersize=3,
-                alpha=0.7)
-    axs[1].axhline(0, color='black', linestyle='--', linewidth=0.8)
+    # bottom plot for unemployment
+    axs[1].plot(time_axis, unemployment_path_positive_shock, label='Response to Positive GDP Shock (+2%)', color='green',
+                marker='o', markersize=3, alpha=0.7)
+    axs[1].plot(time_axis, unemployment_path_negative_shock, label='Response to Negative GDP Shock (-2%)', color='red',
+                marker='x', markersize=3, alpha=0.7)
     axs[1].set_title('Dynamic Response of Unemployment Rate')
     axs[1].set_xlabel('Quarters after Shock')
-    axs[1].set_ylabel('Change in Unemployment Rate (%)')
-    axs[1].grid(True, linestyle=':', alpha=0.6)
+    axs[1].set_ylabel('Unemployment Rate (%)')
+    axs[1].grid(True, alpha=0.4)
     axs[1].legend()
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -276,7 +279,6 @@ def part2_4(ar_model, adl_model, horizon=80):
 
 
 if __name__ == "__main__":
-
     part1_1()
     best_model_p1, best_p_p1 = part1_2()
     part1_3_and_4(best_model_p1, best_p_p1)
@@ -292,4 +294,4 @@ if __name__ == "__main__":
     beta_hat = params_adl_selected[1 + p_un_selected:].values
     part2_3(alpha_hat, phi_hat, beta_hat, X_bar=2.0)
 
-    part2_4(best_model_ar, best_model_adl)
+    part2_4(gdp_ar_model=best_model_ar, unemployment_adl_model=best_model_adl, gdp_data=gdp_df, un_data=un_series)
