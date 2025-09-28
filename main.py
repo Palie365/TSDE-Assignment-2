@@ -188,7 +188,6 @@ def part2_3(alpha, phi, beta, X_bar):
 
 
 def part2_4(gdp_ar_model, unemployment_adl_model, gdp_data, un_data, horizon=70):
-
     # get the last values from the data to use as the starting point for the plots
     gdp_start_value = gdp_data.iloc[-1].values[0]
     unemployment_start_value = un_data.iloc[-1]
@@ -248,27 +247,40 @@ def part2_4(gdp_ar_model, unemployment_adl_model, gdp_data, un_data, horizon=70)
     unemployment_path_positive_shock = unemployment_start_value + (unemployment_derivatives * positive_shock_size)
     unemployment_path_negative_shock = unemployment_start_value + (unemployment_derivatives * negative_shock_size)
 
-    # now, make the plot
-    time_axis = np.arange(horizon)
+    # origin line visual
+    pre_shock_periods = 5
+    pre_shock_time_axis = np.arange(-pre_shock_periods, 0)
+    post_shock_time_axis = np.arange(horizon)
+
+    time_axis = np.concatenate([pre_shock_time_axis, post_shock_time_axis])
+
+    pre_shock_gdp_path = np.full(pre_shock_periods, gdp_start_value)
+    pre_shock_unemployment_path = np.full(pre_shock_periods, unemployment_start_value)
+
+    full_gdp_path_positive = np.concatenate([pre_shock_gdp_path, gdp_path_positive_shock])
+    full_gdp_path_negative = np.concatenate([pre_shock_gdp_path, gdp_path_negative_shock])
+    full_unemployment_path_positive = np.concatenate([pre_shock_unemployment_path, unemployment_path_positive_shock])
+    full_unemployment_path_negative = np.concatenate([pre_shock_unemployment_path, unemployment_path_negative_shock])
+
+    # plot
     fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
-    fig.suptitle('Impulse Response Functions to a Shock in GDP Growth', fontsize=16)
 
     # top plot for GDP
-    axs[0].plot(time_axis, gdp_path_positive_shock, label='Response to Positive Shock (+2%)', color='green', marker='o',
+    axs[0].plot(time_axis, full_gdp_path_positive, label='Response to Positive Shock (+2%)', color='green', marker='o',
                 markersize=3, alpha=0.7)
-    axs[0].plot(time_axis, gdp_path_negative_shock, label='Response to Negative Shock (-2%)', color='red', marker='x',
+    axs[0].plot(time_axis, full_gdp_path_negative, label='Response to Negative Shock (-2%)', color='red', marker='x',
                 markersize=3, alpha=0.7)
-    axs[0].set_title('Dynamic Response of GDP Growth Rate')
+    axs[0].set_title('IRF GDP')
     axs[0].set_ylabel('GDP Growth Rate (%)')
     axs[0].grid(True, alpha=0.4)
     axs[0].legend()
 
     # bottom plot for unemployment
-    axs[1].plot(time_axis, unemployment_path_positive_shock, label='Response to Positive GDP Shock (+2%)', color='green',
+    axs[1].plot(time_axis, full_unemployment_path_positive, label='Response to Positive GDP Shock (+2%)', color='green',
                 marker='o', markersize=3, alpha=0.7)
-    axs[1].plot(time_axis, unemployment_path_negative_shock, label='Response to Negative GDP Shock (-2%)', color='red',
+    axs[1].plot(time_axis, full_unemployment_path_negative, label='Response to Negative GDP Shock (-2%)', color='red',
                 marker='x', markersize=3, alpha=0.7)
-    axs[1].set_title('Dynamic Response of Unemployment Rate')
+    axs[1].set_title('IRF Unemployment rate')
     axs[1].set_xlabel('Quarters after Shock')
     axs[1].set_ylabel('Unemployment Rate (%)')
     axs[1].grid(True, alpha=0.4)
@@ -295,3 +307,4 @@ if __name__ == "__main__":
     part2_3(alpha_hat, phi_hat, beta_hat, X_bar=2.0)
 
     part2_4(gdp_ar_model=best_model_ar, unemployment_adl_model=best_model_adl, gdp_data=gdp_df, un_data=un_series)
+
