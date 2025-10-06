@@ -66,22 +66,27 @@ def part1_2():
 
 def part1_3_and_4(best_model, best_p, h=8):
     print("\n--- PART 1.3 & 1.4: Forecasting and Residual Analysis ---")
-    const_hat = best_model.params[0]
+
+    # --- CORRECTION ---
+    # The 'const' from sm.tsa.ARIMA is the process mean (μ), not the intercept (c).
+    mean_hat = best_model.params[0]
     phi_hat = best_model.params[1]
+
+    # correction to compute the real intercepts
+    intercept_hat = mean_hat * (1 - phi_hat)
 
     # forecasts
     forecasts = []
     X_T = data1[T1 - 1]
     for _ in range(h):
-        next_val = const_hat + phi_hat * X_T
+        next_val = intercept_hat + phi_hat * X_T
         forecasts.append(next_val)
         X_T = next_val
     forecasts = np.array(forecasts)
 
-    # variance and standard error for CI
-
     var_hat = np.var(best_model.resid, ddof=best_p + 1)
-    se = np.sqrt(var_hat * np.cumsum(phi_hat ** (2 * np.arange(1, h + 1))))
+    psi_sq_sum = np.cumsum(phi_hat ** (2 * np.arange(h)))
+    se = np.sqrt(var_hat * psi_sq_sum)
     ci_lower = forecasts - 1.96 * se
     ci_upper = forecasts + 1.96 * se
 
@@ -193,19 +198,25 @@ def part2_4(gdp_ar_model, unemployment_adl_model, gdp_data, un_data, horizon=70)
     unemployment_start_value = un_data.iloc[-1]
     print(f"Using origins: GDP Growth = {gdp_start_value:.2f}, Unemployment = {unemployment_start_value:.2f}")
 
+    # correction to compute the real intercepts
+    gdp_equilibrium = gdp_ar_model.params['const']
+    adl_params = unemployment_adl_model.params
+    unemployment_const = adl_params['const']
+    unemployment_p = len(unemployment_adl_model.ar_lags)
+    unemployment_ar_coeffs = adl_params[1: 1 + unemployment_p].values
+    unemployment_dl_coeffs = adl_params[1 + unemployment_p:].values
+    unemployment_equilibrium = (unemployment_const + np.sum(unemployment_dl_coeffs) * gdp_equilibrium) / (
+                1 - np.sum(unemployment_ar_coeffs))
+    print(
+        f"Plotting convergence to equilibrium: GDP Mean = {gdp_equilibrium:.2f}, Unemployment Mean = {unemployment_equilibrium:.2f}")
+
     # get coefficients from the GDP model
     gdp_ar_coeffs = gdp_ar_model.params[1:].values
     gdp_p = gdp_ar_model.model.order[0]
 
     # get coefficients from the Unemployment ADL model
-    adl_params = unemployment_adl_model.params
-    unemployment_p = len(unemployment_adl_model.ar_lags)
-    # The number of beta coeffs is total params - const - ar_coeffs
     num_beta_coeffs = len(adl_params) - 1 - unemployment_p
-    # The order q is the number of betas minus one (for the L0 term)
     unemployment_q = num_beta_coeffs - 1
-    unemployment_ar_coeffs = adl_params[1: 1 + unemployment_p].values
-    unemployment_dl_coeffs = adl_params[1 + unemployment_p:].values
 
     # create empty arrays to store the results of the derivative calculations
     gdp_derivatives = np.zeros(horizon)
@@ -217,22 +228,12 @@ def part2_4(gdp_ar_model, unemployment_adl_model, gdp_data, un_data, horizon=70)
 
     # loop through time to calculate the effect of the shock step by step
     for h in range(1, horizon):
-
-        # calculate the response of GDP to its own past values
-        # this is the recursive formula for an AR(p) process, see Week 4 Slide 11/44
         for i in range(gdp_p):
             if h - (i + 1) >= 0:
                 gdp_derivatives[h] += gdp_ar_coeffs[i] * gdp_derivatives[h - (i + 1)]
-
-        # calculate the response of Unemployment
-        # this is the recursive formula for an ADL(p,q) process, see Week 4 Slide 35/44
-
-        # effect from its own past (the AR part of the ADL)
         for i in range(unemployment_p):
             if h - (i + 1) >= 0:
                 unemployment_derivatives[h] += unemployment_ar_coeffs[i] * unemployment_derivatives[h - (i + 1)]
-
-        # effect from current and past GDP values (the DL part of the ADL)
         for j in range(unemployment_q + 1):
             if h - j >= 0:
                 unemployment_derivatives[h] += unemployment_dl_coeffs[j] * gdp_derivatives[h - j]
@@ -251,12 +252,9 @@ def part2_4(gdp_ar_model, unemployment_adl_model, gdp_data, un_data, horizon=70)
     pre_shock_periods = 5
     pre_shock_time_axis = np.arange(-pre_shock_periods, 0)
     post_shock_time_axis = np.arange(horizon)
-
     time_axis = np.concatenate([pre_shock_time_axis, post_shock_time_axis])
-
     pre_shock_gdp_path = np.full(pre_shock_periods, gdp_start_value)
     pre_shock_unemployment_path = np.full(pre_shock_periods, unemployment_start_value)
-
     full_gdp_path_positive = np.concatenate([pre_shock_gdp_path, gdp_path_positive_shock])
     full_gdp_path_negative = np.concatenate([pre_shock_gdp_path, gdp_path_negative_shock])
     full_unemployment_path_positive = np.concatenate([pre_shock_unemployment_path, unemployment_path_positive_shock])
@@ -280,6 +278,7 @@ def part2_4(gdp_ar_model, unemployment_adl_model, gdp_data, un_data, horizon=70)
                 marker='o', markersize=3, alpha=0.7)
     axs[1].plot(time_axis, full_unemployment_path_negative, label='Response to Negative GDP Shock (-2%)', color='red',
                 marker='x', markersize=3, alpha=0.7)
+
     axs[1].set_title('IRF Unemployment rate')
     axs[1].set_xlabel('Quarters after Shock')
     axs[1].set_ylabel('Unemployment Rate (%)')
