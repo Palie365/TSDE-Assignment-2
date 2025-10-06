@@ -67,8 +67,6 @@ def part1_2():
 def part1_3_and_4(best_model, best_p, h=8):
     print("\n--- PART 1.3 & 1.4: Forecasting and Residual Analysis ---")
 
-    # --- CORRECTION ---
-    # The 'const' from sm.tsa.ARIMA is the process mean (μ), not the intercept (c).
     mean_hat = best_model.params[0]
     phi_hat = best_model.params[1]
 
