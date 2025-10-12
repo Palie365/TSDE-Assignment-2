@@ -159,6 +159,23 @@ def part2_1(gdp_df, un_series):
     print(f"\nSelected AR model for GDP: AR({best_p_ar})")
     print(best_model_ar.summary())
 
+    print("\n--- Calculating the True Intercept for the AR(p) Model ---")
+    ar_params = best_model_ar.params
+    gdp_mean_mu = ar_params['const']
+
+    p_gdp = best_model_ar.model.order[0]
+    gdp_ar_coeffs = ar_params[1:1 + p_gdp]
+
+    sum_of_gdp_ar_coeffs = np.sum(gdp_ar_coeffs)
+
+    # intercept = mean * (1 - sum_of_ar_coefficients)
+    gdp_intercept_c = gdp_mean_mu * (1 - sum_of_gdp_ar_coeffs)
+
+    print(f"The AR model for GDP reported a mean (μ) of: {gdp_mean_mu:.4f}")
+    print(f"The sum of its {p_gdp} AR coefficients (φ's) is: {sum_of_gdp_ar_coeffs:.4f}")
+    print(f"Therefore, the calculated true intercept (c) is: {gdp_intercept_c:.4f}")
+
+
     print("\n--- ADL Model Selection for Unemployment ---")
     aic_values_adl = []
     p_q_vals = []
